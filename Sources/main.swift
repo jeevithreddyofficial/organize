@@ -55,6 +55,9 @@ func setFrame(_ el: AXUIElement, _ r: CGRect) {
 /// Standard, visible, non-minimized, non-fullscreen windows on the current Space.
 func currentWindows() -> [Win] {
     var out: [Win] = []
+    // Only windows actually on screen in the current Space (AX can also report other Spaces' windows).
+    let onScreen = Set(((CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? [])
+        .compactMap { ($0[kCGWindowNumber as String] as? Int).map { CGWindowID($0) } })
     for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular && !app.isHidden {
         let ax = AXUIElementCreateApplication(app.processIdentifier)
         guard let wins: [AXUIElement] = attr(ax, kAXWindowsAttribute) else { continue }
@@ -67,6 +70,7 @@ func currentWindows() -> [Win] {
             guard let fr = frameOf(w), fr.width > 120, fr.height > 80 else { continue }
             var wid: CGWindowID = 0
             _ = _AXUIElementGetWindow(w, &wid)
+            guard onScreen.contains(wid) else { continue }
             out.append(Win(el: w, id: wid, frame: fr))
         }
     }
