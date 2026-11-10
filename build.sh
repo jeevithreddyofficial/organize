@@ -16,5 +16,7 @@ cat > $APP/Contents/Info.plist <<P
 <key>LSUIElement</key><true/>
 </dict></plist>
 P
-codesign --force --sign - $APP
+# Ad-hoc sign with a *stable* designated requirement (identifier only). Without this, macOS ties the
+# Accessibility permission to the exact binary hash, so every rebuild silently invalidates it.
+codesign --force --sign - -r='designated => identifier "com.local.organize"' $APP
 echo "Built $APP"

@@ -6,7 +6,7 @@ A tiny macOS menu-bar app that automatically tiles your open windows into a grid
 - If there are 2+ windows and they aren't already in a grid, it tiles them (4 windows become a 2x2).
 - If they're already in a grid, it leaves them alone.
 - Minimized, hidden and full-screen windows are ignored.
-- Menu-bar options: toggle auto-organize, "Organize Now".
+- Menu-bar options: toggle auto-organize, "Organize Now" (global hotkey **⌃⌥O**), open Accessibility settings.
 
 ## Build & run
 
@@ -16,8 +16,11 @@ open Organize.app
 ```
 
 Requires the Xcode command-line tools (`swiftc`). On first launch, grant access under
-System Settings → Privacy & Security → Accessibility, then relaunch. Rebuilding changes the
-ad-hoc signature, so you may need to toggle the permission off and on again.
+System Settings → Privacy & Security → Accessibility (use **+** and pick `Organize.app`). No relaunch
+is needed. The build signs the app with a stable identifier-based requirement, so the permission
+survives rebuilds.
+
+Tested on macOS 26 (Tahoe). It uses private macOS APIs, so future macOS releases may break it.
 
 ## Notes
 

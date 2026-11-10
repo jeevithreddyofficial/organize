@@ -1,5 +1,6 @@
 import Cocoa
 import ApplicationServices
+import Carbon.HIToolbox
 
 // MARK: - Private APIs (Spaces + AX window id)
 @_silgen_name("CGSMainConnectionID") func CGSMainConnectionID() -> Int32
@@ -138,20 +139,40 @@ final class Controller: NSObject, NSApplicationDelegate {
         toggleItem.target = self; toggleItem.state = enabled ? .on : .off
         m.addItem(toggleItem)
         let now = NSMenuItem(title: "Organize Now", action: #selector(organizeNow), keyEquivalent: "o"); now.target = self
+        now.keyEquivalentModifierMask = [.control, .option]
         m.addItem(now)
         m.addItem(.separator()); m.addItem(statusLine); m.addItem(.separator())
         m.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = m
 
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        if !AXIsProcessTrustedWithOptions(opts) { statusLine.title = "Grant Accessibility access, then relaunch" }
+        if !AXIsProcessTrustedWithOptions(opts) { statusLine.title = "Needs Accessibility access (see menu)" }
+        let ax = NSMenuItem(title: "Open Accessibility Settings…", action: #selector(openAccessibility), keyEquivalent: ""); ax.target = self
+        m.insertItem(ax, at: 3)
 
+        registerHotKey()
         timer = Timer.scheduledTimer(withTimeInterval: 0.7, repeats: true) { [weak self] _ in self?.tick() }
     }
 
     @objc func toggle() {
         enabled.toggle(); toggleItem.state = enabled ? .on : .off
         UserDefaults.standard.set(enabled, forKey: "enabled"); lastSignature = ""
+    }
+
+    /// Global hotkey ⌃⌥O (works in any app, needs no extra permission).
+    func registerHotKey() {
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetApplicationEventTarget(), { _, _, ctx in
+            Unmanaged<Controller>.fromOpaque(ctx!).takeUnretainedValue().organizeNow()
+            return noErr
+        }, 1, &spec, Unmanaged.passUnretained(self).toOpaque(), nil)
+        var ref: EventHotKeyRef?
+        RegisterEventHotKey(UInt32(kVK_ANSI_O), UInt32(controlKey | optionKey),
+                            EventHotKeyID(signature: 0x4F52474E, id: 1), GetApplicationEventTarget(), 0, &ref)
+    }
+
+    @objc func openAccessibility() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
 
     @objc func organizeNow() {
@@ -163,6 +184,8 @@ final class Controller: NSObject, NSApplicationDelegate {
     func tick() {
         let trusted = AXIsProcessTrusted()
         let wins = trusted ? currentWindows() : []
+        if trusted, statusLine.title.hasPrefix("Needs Accessibility") { statusLine.title = "Ready"; lastSignature = "" }
+        if !trusted { statusLine.title = "Needs Accessibility access (see menu)" }
         guard trusted, enabled else { return }
         let sig = wins.map { String($0.id) }.sorted().joined(separator: ",")
         if sig != lastSignature {
